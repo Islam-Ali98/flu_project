@@ -1,0 +1,148 @@
+---
+title: "Untitled"
+author: "Islam Afifi"
+date: "2023-11-10"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+library(gridExtra)
+
+```
+
+```{r}
+flu<-readr::read_csv("flu.csv")
+
+```
+
+
+```{r}
+flu<-flu|>select(WHOREGION,FLUSEASON,HEMISPHERE,COUNTRY_AREA_TERRITORY,ISO_WEEKSTARTDATE,
+                 ISO_YEAR,ISO_WEEK,SPEC_PROCESSED_NB,INF_ALL,
+                 INF_NEGATIVE,HUMAN_CORONA,METAPNEUMO,PARAINFLUENZA,RHINO,
+              RSV,INF_A,INF_B)
+
+
+```
+
+
+```{r}
+str(flu)
+
+```
+
+```{r}
+# Summary statistics
+summary(flu)
+```
+
+```{r}
+# Display the first few rows of the dataset
+head(flu)
+```
+
+```{r}
+# Check for missing values
+sum(is.na(flu))
+```
+
+```{r}
+flu[is.na(flu)] <- 0
+```
+
+```{r}
+summary_flu<-flu |>
+  group_by(year=ISO_YEAR)%>%
+  summarise(s=sum(SPEC_PROCESSED_NB))
+
+ggplot(summary_flu, aes(x = year, y = s)) + 
+  geom_bar(stat = "sum", fill = "blue") +
+  labs(title = "Number of tested patients Per Three Years",
+       x = "Year",
+       y = "Number of tested patients") +
+  theme_minimal()+
+  scale_y_continuous(labels = scales::comma_format())
+```
+
+```{r}
+x<-flu|> group_by(ISO_YEAR)|>
+  summarise(INF_ALL=sum(INF_ALL),HUMAN_CORONA=sum(HUMAN_CORONA),
+            METAPNEUMO=sum(METAPNEUMO),PARAINFLUENZA=sum(PARAINFLUENZA),
+            RHINO=sum(RHINO),RSV=sum(RSV))
+
+x$ISO_YEAR <- as.numeric(as.character(x$ISO_YEAR))
+
+
+
+gathered_data <- x %>%
+  gather(variable, value, INF_ALL)
+
+# Create a line chart
+ggplot(gathered_data, aes(x = ISO_YEAR, y = value, color = variable)) +
+  geom_line() +
+  labs(title = "Time Series of Variables", y = "Value") +
+  scale_color_manual(values = c(
+    "INF_ALL" = "red"
+  )) +
+  
+  theme_minimal()
+```
+
+```{r}
+y <- flu %>%
+  summarise(INF_A = sum(INF_A), INF_B = sum(INF_B))
+
+total <- sum(y)
+percentage_data <- y / total * 100
+
+
+
+# Create a pie chart
+pie(unlist(percentage_data), labels = paste0(names(percentage_data), ": ", round(percentage_data, 1), "%"), col = rainbow(length(y)))
+
+# Add a legend
+legend("topright", legend = names(y), fill = rainbow(length(y)))
+```
+
+```{r}
+library(ggcorrplot)
+flu_correlation_data <- flu %>%
+  filter(ISO_YEAR >= 2015) %>%
+  select(INF_ALL, HUMAN_CORONA, METAPNEUMO, PARAINFLUENZA, RHINO, RSV)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(flu_correlation_data)
+
+
+
+# Plot the heatmap
+ggcorrplot(cor_matrix, 
+           hc.order = TRUE, 
+           type = "lower", 
+           lab = TRUE, 
+           lab_size = 3, 
+           method = "circle", 
+           colors = c("blue", "white", "red"),
+           title = "Correlation Heatmap of Influenza Variables")
+```
+
+```{r}
+z<-flu|>group_by(WHOREGION)|>summarise(s=sum(SPEC_PROCESSED_NB))
+
+z <- mutate(z, percentage = s / sum(s) * 100)
+
+# Create a horizontal bar chart
+plot2<-ggplot(z, aes(x = percentage, y = fct_reorder(WHOREGION, -percentage))) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Percentage of Each WHO Region",
+       x = "Percentage",
+       y = "WHO Region") +
+  xlab("WHOREGION") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  coord_flip()
+plot2 +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)), vjust = -0.5, size = 4)
+```
+
